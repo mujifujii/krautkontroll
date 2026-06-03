@@ -1,0 +1,52 @@
+name: Monitoring
+
+# Simuliertes Monitoring der "Produktionsumgebung" (Could-Kriterium).
+# Wird regelmäßig automatisch getriggert und kann manuell gestartet werden.
+on:
+  schedule:
+    - cron: '*/30 * * * *'   # alle 30 Minuten
+  workflow_dispatch:          # manueller Trigger (z. B. für die Demo/Abgabe)
+
+jobs:
+  healthcheck:
+    name: Healthcheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: JDK 21 einrichten
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: mvnw ausführbar machen
+        run: chmod +x mvnw
+
+      - name: Anwendung bauen
+        run: ./mvnw -B package -DskipTests
+
+      - name: Anwendung im Hintergrund starten
+        run: |
+          java -jar target/*.jar > app.log 2>&1 &
+          echo $! > app.pid
+
+      - name: /actuator/health abfragen (mit Retry)
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8080/actuator/health | grep -q '"status":"UP"'; then
+              echo "✅ Monitoring OK – Anwendung ist UP (Versuch $i)"
+              exit 0
+            fi
+            echo "… noch nicht bereit (Versuch $i/30)"
+            sleep 5
+          done
+          echo "❌ Monitoring FEHLER – Anwendung nicht erreichbar"
+          cat app.log
+          exit 1
+
+      - name: Anwendung stoppen
+        if: always()
+        run: kill "$(cat app.pid)" || true

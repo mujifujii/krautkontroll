@@ -1,6 +1,9 @@
 package kkbf.krautkontroll;
 
+import org.springframework.stereotype.Service;
+
 /** Berechnet einen einfachen Crowd-Risk-Score aus der Auslastung. */
+@Service
 public class RiskCalculator {
 
     /**

@@ -1,19 +1,21 @@
 name: CI
 
-# Läuft bei jedem Push und jedem Pull Request
+# Continuous Integration: läuft bei jedem Push und jedem Pull Request.
 on:
   push:
   pull_request:
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: Bauen, testen (Unit + Integration), Coverage – die eigentliche CI.
+  # ---------------------------------------------------------------------------
   build-and-test:
+    name: Build & Test
     runs-on: ubuntu-latest
     steps:
-      # 1. Code aus dem Repo holen
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. Java 21 (Temurin) bereitstellen + Maven-Cache
       - name: JDK 21 einrichten
         uses: actions/setup-java@v4
         with:
@@ -21,10 +23,71 @@ jobs:
           java-version: '21'
           cache: maven
 
-      # 3. Maven-Wrapper unter Linux ausführbar machen
       - name: mvnw ausführbar machen
         run: chmod +x mvnw
 
-      # 4. Bauen + Tests laufen lassen (Unit + später Integration)
-      - name: Build & Test
+      # verify = kompilieren + Unit-Tests (surefire) + Integrationstests
+      # (failsafe) + JaCoCo-Coverage-Report
+      - name: Build, Unit- & Integrationstests + Coverage
         run: ./mvnw -B verify
+
+      - name: Coverage-Report (JaCoCo) als Artefakt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-coverage
+          path: target/site/jacoco
+          if-no-files-found: warn
+
+      - name: Gebautes JAR als Artefakt
+        uses: actions/upload-artifact@v4
+        with:
+          name: krautkontroll-jar
+          path: target/*.jar
+          if-no-files-found: warn
+
+  # ---------------------------------------------------------------------------
+  # Job 2: Continuous Deployment – nur auf main, nur wenn CI grün ist.
+  # Baut ein Docker-Image und veröffentlicht es in der GitHub Container
+  # Registry (ghcr.io) = "Produktivumgebung". Kein externer Account nötig.
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Deploy (Docker -> GHCR)
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: JDK 21 einrichten
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: mvnw ausführbar machen
+        run: chmod +x mvnw
+
+      - name: JAR bauen (Tests liefen bereits in Job 1)
+        run: ./mvnw -B package -DskipTests
+
+      - name: Bei GitHub Container Registry anmelden
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image bauen & in Produktiv-Registry pushen
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
