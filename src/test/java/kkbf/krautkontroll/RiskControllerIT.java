@@ -1,39 +1,51 @@
 package kkbf.krautkontroll;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.web.servlet.MockMvc;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Integrationstest (Endung *IT -> wird vom maven-failsafe-plugin ausgeführt).
  *
- * Startet den kompletten Spring-Context und prüft die HTTP-Schnittstelle
- * inklusive Controller + Service zusammen.
+ * Startet die komplette Anwendung inkl. eingebettetem Webserver auf einem
+ * zufälligen Port und ruft die echte HTTP-Schnittstelle auf. Prüft damit
+ * Controller + Service + Web-Schicht im Zusammenspiel.
  */
-@SpringBootTest
-@AutoConfigureMockMvc
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class RiskControllerIT {
 
-    @Autowired
-    private MockMvc mockMvc;
+    // Vom Spring-Test-Framework gesetzt, wenn webEnvironment = RANDOM_PORT.
+    @Value("${local.server.port}")
+    private int port;
 
     @Test
     void liefertScoreUeberHttp() throws Exception {
-        mockMvc.perform(get("/risk").param("attendance", "500").param("capacity", "1000"))
-                .andExpect(status().isOk())
-                .andExpect(content().string("50"));
+        HttpResponse<String> response = get("/risk?attendance=500&capacity=1000");
+        assertEquals(200, response.statusCode());
+        assertEquals("50", response.body());
     }
 
     @Test
     void volleAuslastungLiefert100() throws Exception {
-        mockMvc.perform(get("/risk").param("attendance", "1000").param("capacity", "1000"))
-                .andExpect(status().isOk())
-                .andExpect(content().string("100"));
+        HttpResponse<String> response = get("/risk?attendance=1000&capacity=1000");
+        assertEquals(200, response.statusCode());
+        assertEquals("100", response.body());
+    }
+
+    /** Hilfsmethode: führt eine GET-Anfrage gegen die laufende App aus. */
+    private HttpResponse<String> get(String path) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("http://localhost:" + port + path))
+                .GET()
+                .build();
+        return HttpClient.newHttpClient()
+                .send(request, HttpResponse.BodyHandlers.ofString());
     }
 }
