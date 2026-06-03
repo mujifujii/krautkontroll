@@ -1,0 +1,30 @@
+name: CI
+
+# Läuft bei jedem Push und jedem Pull Request
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Code aus dem Repo holen
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. Java 21 (Temurin) bereitstellen + Maven-Cache
+      - name: JDK 21 einrichten
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # 3. Maven-Wrapper unter Linux ausführbar machen
+      - name: mvnw ausführbar machen
+        run: chmod +x mvnw
+
+      # 4. Bauen + Tests laufen lassen (Unit + später Integration)
+      - name: Build & Test
+        run: ./mvnw -B verify

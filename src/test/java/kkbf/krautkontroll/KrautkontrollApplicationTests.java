@@ -1,0 +1,13 @@
+package kkbf.krautkontroll;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+class KrautkontrollApplicationTests {
+
+    @Test
+    void contextLoads() {
+    }
+
+}
