@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Krautkontroll</title>
+  <base href="/">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <!-- sockjs-client erwartet die Node-globale `global`. Muss VOR dem App-Bundle
+       laufen, deshalb als Inline-Script hier (nicht als ES-Modul-Import). -->
+  <script>window.global = window;</script>
+</head>
+<body>
+  <app-root></app-root>
+</body>
+</html>
