@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Krautkontroll — Domänen-Landkarte</title>
+<style>
+  :root {
+    --bg: #0b0f1a;
+    --bg-soft: #121829;
+    --card: #161d31;
+    --card-hover: #1c2540;
+    --line: #263149;
+    --text: #e8edf7;
+    --muted: #93a1bd;
+    --ud1: #38bdf8; /* Teilnehmer  */
+    --ud2: #a78bfa; /* Raum & Karte */
+    --ud3: #34d399; /* Kommunikation */
+    --ud4: #fb7185; /* Lagebild */
+    --ud5: #fbbf24; /* Daten & Plattform */
+    --ok: #22c55e;
+    --warn: #f59e0b;
+    --miss: #ef4444;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: radial-gradient(1200px 600px at 80% -10%, #1a2540 0%, transparent 60%), var(--bg);
+    background-color: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+
+  header {
+    padding: 48px 24px 28px;
+    text-align: center;
+    background: linear-gradient(180deg, var(--bg-soft), var(--bg));
+    border-bottom: 1px solid var(--line);
+  }
+  header h1 {
+    margin: 0 0 6px;
+    font-size: clamp(28px, 4vw, 44px);
+    letter-spacing: -0.5px;
+    background: linear-gradient(90deg, var(--ud1), var(--ud2), var(--ud3), var(--ud5));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  header p { margin: 0 auto; max-width: 720px; color: var(--muted); }
+  .kpis { margin-top: 18px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .kpi {
+    background: var(--card); border: 1px solid var(--line); border-radius: 999px;
+    padding: 6px 14px; font-size: 13px; color: var(--muted);
+  }
+  .kpi b { color: var(--text); }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 20px 64px; }
+
+  /* --- 3 Eimer Mapping --- */
+  .buckets {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px; margin: 8px 0 38px;
+  }
+  .bucket {
+    background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--ud3);
+    border-radius: 12px; padding: 14px 16px;
+  }
+  .bucket h4 { margin: 0 0 4px; font-size: 14px; }
+  .bucket .arrow { color: var(--muted); font-size: 13px; }
+  .bucket.warn { border-left-color: var(--warn); }
+
+  /* --- Legend / Filter --- */
+  .toolbar {
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    margin-bottom: 26px; padding: 12px; background: var(--bg-soft);
+    border: 1px solid var(--line); border-radius: 12px;
+  }
+  .toolbar .label { color: var(--muted); font-size: 13px; margin-right: 4px; }
+  .filter {
+    cursor: pointer; border: 1px solid var(--line); background: var(--card);
+    color: var(--text); border-radius: 999px; padding: 6px 14px; font-size: 13px;
+    transition: all .15s ease;
+  }
+  .filter:hover { background: var(--card-hover); }
+  .filter.active { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 600; }
+  .legend { margin-left: auto; display: flex; gap: 14px; font-size: 12px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+  /* --- Über-Domäne Section --- */
+  .ud { margin-bottom: 34px; }
+  .ud-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .ud-badge {
+    width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center;
+    font-weight: 700; color: #0b0f1a; font-size: 15px;
+  }
+  .ud-head h2 { margin: 0; font-size: 19px; }
+  .ud-head .tier { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 6px; padding: 2px 7px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px; position: relative; transition: transform .12s ease, background .12s ease, border-color .12s ease;
+    border-top: 3px solid var(--accent, var(--line));
+  }
+  .card:hover { transform: translateY(-3px); background: var(--card-hover); }
+  .card h3 { margin: 0 0 6px; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+  .card .purpose { color: var(--muted); font-size: 13.5px; margin: 0 0 12px; }
+  .objs { display: flex; flex-wrap: wrap; gap: 6px; }
+  .obj {
+    font-size: 11.5px; font-family: ui-monospace, "Cascadia Code", monospace;
+    background: rgba(255,255,255,.05); border: 1px solid var(--line);
+    border-radius: 6px; padding: 2px 7px; color: var(--text);
+  }
+  .status {
+    position: absolute; top: 14px; right: 14px; font-size: 11px; font-weight: 600;
+    padding: 3px 9px; border-radius: 999px;
+  }
+  .s-ok   { background: rgba(34,197,94,.15);  color: #4ade80; border: 1px solid rgba(34,197,94,.4); }
+  .s-warn { background: rgba(245,158,11,.15); color: #fbbf24; border: 1px solid rgba(245,158,11,.4); }
+  .s-miss { background: rgba(239,68,68,.15);  color: #f87171; border: 1px solid rgba(239,68,68,.4); }
+
+  .card.hidden { display: none; }
+
+  footer { text-align: center; color: var(--muted); font-size: 13px; padding: 0 20px 50px; }
+  footer code { background: var(--card); padding: 2px 6px; border-radius: 5px; border: 1px solid var(--line); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Krautkontroll · Domänen-Landkarte</h1>
+  <p>Die fachliche Struktur der Crowd-Risk-Software: <b>13 Domänen</b> in <b>5 Über-Domänen</b>.
+     Farbe = Über-Domäne, Badge = Umsetzungsstand.</p>
+  <div class="kpis">
+    <span class="kpi"><b>5</b> Über-Domänen</span>
+    <span class="kpi"><b>13</b> Domänen</span>
+    <span class="kpi"><b style="color:var(--ok)">3</b> vorhanden</span>
+    <span class="kpi"><b style="color:var(--miss)">9</b> offen</span>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- Mapping der 3 Eimer -->
+  <h2 style="font-size:16px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.6px;margin:0 0 12px">Deine 3 Eimer → formale Domänen</h2>
+  <div class="buckets">
+    <div class="bucket">
+      <h4>📡 data-transfer</h4>
+      <div class="arrow">Broadcast, Befehle, Fragen, Quittierung →<br><b>Communication</b></div>
+    </div>
+    <div class="bucket">
+      <h4>👥 individuals</h4>
+      <div class="arrow">general / receiver + Gruppen →<br><b>Participants</b> + <b>Identity/Access</b></div>
+    </div>
+    <div class="bucket warn">
+      <h4>🚨 state (emergency/help)</h4>
+      <div class="arrow">keine eigene Domäne — ist ein <b>Status</b>-VO + <b>RoutingMode</b>;<br>reagiert wird in Incident / Alerting / Routing</div>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <span class="label">Filter:</span>
+    <button class="filter active" data-filter="all">Alle</button>
+    <button class="filter" data-filter="ok">✓ Vorhanden</button>
+    <button class="filter" data-filter="miss">🔴 Offen</button>
+    <button class="filter" data-filter="core">Core</button>
+    <div class="legend">
+      <span><i class="swatch" style="background:var(--ud1)"></i>Teilnehmer</span>
+      <span><i class="swatch" style="background:var(--ud2)"></i>Raum</span>
+      <span><i class="swatch" style="background:var(--ud3)"></i>Kommunikation</span>
+      <span><i class="swatch" style="background:var(--ud4)"></i>Lagebild</span>
+      <span><i class="swatch" style="background:var(--ud5)"></i>Daten</span>
+    </div>
+  </div>
+
+  <!-- ÜD1 -->
+  <section class="ud">
+    <div class="ud-head">
+      <div class="ud-badge" style="background:var(--ud1)">1</div>
+      <h2>Teilnehmer &amp; Zugang</h2>
+      <span class="tier">Supporting</span>
+    </div>
+    <div class="grid">
+      <div class="card" data-status="ok" data-tier="supporting" style="--accent:var(--ud1)">
+        <span class="status s-ok">✓ vorhanden</span>
+        <h3>Identity / Access</h3>
+        <p class="purpose">Authentifizierung &amp; Rollen: wer darf was?</p>
+        <div class="objs"><span class="obj">User</span><span class="obj">Role</span><span class="obj">AccessToken</span></div>
+      </div>
+      <div class="card" data-status="ok" data-tier="supporting" style="--accent:var(--ud1)">
+        <span class="status s-ok">✓ vorhanden</span>
+        <h3>Participants</h3>
+        <p class="purpose">Teilnehmer &amp; Gruppen verwalten (inkl. Affinität).</p>
+        <div class="objs"><span class="obj">Receiver</span><span class="obj">Group</span><span class="obj">Affinity</span><span class="obj">Marshal</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ÜD2 -->
+  <section class="ud">
+    <div class="ud-head">
+      <div class="ud-badge" style="background:var(--ud2)">2</div>
+      <h2>Raum &amp; Karte</h2>
+      <span class="tier">Core</span>
+    </div>
+    <div class="grid">
+      <div class="card" data-status="miss" data-tier="core" style="--accent:var(--ud2)">
+        <span class="status s-miss">🔴 offen</span>
+        <h3>Spatial</h3>
+        <p class="purpose">Geo-Raum: Positionen, Zonen, Dichte. Fundament des Map-First-UI.</p>
+        <div class="objs"><span class="obj">Position(VO)</span><span class="obj">Zone(Polygon)</span><span class="obj">GeoService</span><span class="obj">Heatmap</span></div>
+      </div>
+      <div class="card" data-status="miss" data-tier="core" style="--accent:var(--ud2)">
+        <span class="status s-miss">🔴 offen</span>
+        <h3>Routing</h3>
+        <p class="purpose">Wege &amp; Verantwortlichkeit von Nachrichten (Hierarchie vs. Notfall).</p>
+        <div class="objs"><span class="obj">RoutingMode</span><span class="obj">RoutingService</span><span class="obj">AssignmentService</span><span class="obj">SpanOfControl</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ÜD3 -->
+  <section class="ud">
+    <div class="ud-head">
+      <div class="ud-badge" style="background:var(--ud3)">3</div>
+      <h2>Kommunikation &amp; Interaktion</h2>
+      <span class="tier">Core</span>
+    </div>
+    <div class="grid">
+      <div class="card" data-status="ok" data-tier="core" style="--accent:var(--ud3)">
+        <span class="status s-ok">✓ vorhanden</span>
+        <h3>Communication</h3>
+        <p class="purpose">Nachrichten Coordinator ↔ Crowd, beidseitig.</p>
+        <div class="objs"><span class="obj">Message</span><span class="obj">Broadcast</span><span class="obj">Acknowledgement</span><span class="obj">StatusReport</span></div>
+      </div>
+      <div class="card" data-status="miss" data-tier="core" style="--accent:var(--ud3)">
+        <span class="status s-miss">🔴 offen</span>
+        <h3>Alerting</h3>
+        <p class="purpose">System-getriebene Warnungen &amp; Eskalation (≠ Communication).</p>
+        <div class="objs"><span class="obj">Alert</span><span class="obj">AlertChannel(Email)</span><span class="obj">EscalationRule</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ÜD4 -->
+  <section class="ud">
+    <div class="ud-head">
+      <div class="ud-badge" style="background:var(--ud4)">4</div>
+      <h2>Lagebild &amp; Entscheidung</h2>
+      <span class="tier">Core · das „Gehirn“</span>
+    </div>
+    <div class="grid">
+      <div class="card" data-status="miss" data-tier="core" style="--accent:var(--ud4)">
+        <span class="status s-miss">🔴 offen</span>
+        <h3>Risk</h3>
+        <p class="purpose">Risiko-Score, Schwellwerte, Vorhersage. (RiskCalculator existiert als Keim.)</p>
+        <div class="objs"><span class="obj">RiskScore</span><span class="obj">RiskEngine</span><span class="obj">Threshold</span></div>
+      </div>
+      <div class="card" data-status="miss" data-tier="core" style="--accent:var(--ud4)">
+        <span class="status s-miss">🔴 offen</span>
+        <h3>Incident</h3>
+        <p class="purpose">Erkannte Vorfälle: Überfüllung, Stau, Gruppentrennung.</p>
+        <div class="objs"><span class="obj">Incident</span><span class="obj">OVERCROWD</span><span class="obj">STAU</span><span class="obj">SEPARATION</span></div>
+      </div>
+      <div class="card" data-status="miss" data-tier="core" style="--accent:var(--ud4)">
+        <span class="status s-miss">🔴 offen</span>
+        <h3>Relationships</h3>
+        <p class="purpose">Beziehungen &amp; Kohäsion; Graph als berechnete Projektion.</p>
+        <div class="objs"><span class="obj">RelationshipGraph</span><span class="obj">CohesionService</span><span class="obj">Affinity</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ÜD5 -->
+  <section class="ud">
+    <div class="ud-head">
+      <div class="ud-badge" style="background:var(--ud5)">5</div>
+      <h2>Daten &amp; Plattform</h2>
+      <span class="tier">Generic</span>
+    </div>
+    <div class="grid">
+      <div class="card" data-status="miss" data-tier="generic" style="--accent:var(--ud5)">
+        <span class="status s-miss">🔴 offen</span>
+        <h3>Ingestion</h3>
+        <p class="purpose">Externe Datenquellen anbinden &amp; normalisieren.</p>
+        <div class="objs"><span class="obj">WeatherFeed</span><span class="obj">GtfsFeed</span><span class="obj">CapacityMasterData</span></div>
+      </div>
+      <div class="card" data-status="miss" data-tier="generic" style="--accent:var(--ud5)">
+        <span class="status s-miss">🔴 offen</span>
+        <h3>EventLog</h3>
+        <p class="purpose">Audit-Trail &amp; Replay von Ereignissen.</p>
+        <div class="objs"><span class="obj">EventLogEntry</span></div>
+      </div>
+      <div class="card" data-status="miss" data-tier="generic" style="--accent:var(--ud5)">
+        <span class="status s-miss">🔴 offen</span>
+        <h3>Scenario</h3>
+        <p class="purpose">Szenario-Presets: Festival / Evakuierung / Demo.</p>
+        <div class="objs"><span class="obj">Scenario</span><span class="obj">ScenarioLoader</span></div>
+      </div>
+      <div class="card" data-status="ok" data-tier="generic" style="--accent:var(--ud5)">
+        <span class="status s-ok">✓ gerade gebaut</span>
+        <h3>Monitoring / Simulation</h3>
+        <p class="purpose">Virtuelle Crowd + Health. Lebt im Walking Skeleton.</p>
+        <div class="objs"><span class="obj">CrowdSimulator</span><span class="obj">HealthCheck</span></div>
+      </div>
+      <div class="card" data-status="miss" data-tier="generic" style="--accent:var(--ud5)">
+        <span class="status s-miss">🔴 offen</span>
+        <h3>Reporting</h3>
+        <p class="purpose">Nachberichte &amp; Export (z. B. PDF).</p>
+        <div class="objs"><span class="obj">Report</span><span class="obj">Export</span></div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  Blinde Flecken bei dir: <b style="color:var(--ud2)">Raum &amp; Karte</b>,
+  <b style="color:var(--ud4)">Lagebild</b>,
+  <b style="color:var(--ud5)">Daten &amp; Plattform</b> — plus <b style="color:var(--ud3)">Alerting</b>.<br>
+  Diese Landkarte ist die Checkliste fürs Klassendiagramm (Teil 2). · Öffnen: <code>docs/domaenen.html</code>
+</footer>
+
+<script>
+  const filters = document.querySelectorAll('.filter');
+  const cards = document.querySelectorAll('.card[data-status]');
+  filters.forEach(btn => btn.addEventListener('click', () => {
+    filters.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const f = btn.dataset.filter;
+    cards.forEach(c => {
+      const show = f === 'all'
+        || c.dataset.status === f
+        || c.dataset.tier === f;
+      c.classList.toggle('hidden', !show);
+    });
+  });
+</script>
+
+</body>
+</html>

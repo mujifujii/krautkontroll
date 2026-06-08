@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Krautkontroll – Sequenzdiagramm der CD-Pipeline</title>
+  <style>
+    body {
+      font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+      color: #1b1f24;
+      background: #fafbfc;
+    }
+    h1 { font-size: 1.5rem; }
+    p.intro { color: #444; line-height: 1.5; }
+    .diagram {
+      background: #fff;
+      border: 1px solid #e1e4e8;
+      border-radius: 10px;
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+      overflow-x: auto;
+    }
+    table { border-collapse: collapse; margin-top: 1rem; }
+    th, td { border: 1px solid #e1e4e8; padding: 6px 12px; text-align: left; }
+    th { background: #f1f3f5; }
+    code { background: #eef1f4; padding: 1px 5px; border-radius: 4px; }
+    footer { margin-top: 2rem; color: #777; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <h1>Krautkontroll – Continuous-Delivery-Pipeline (Sequenzdiagramm)</h1>
+  <p class="intro">
+    Pipeline-Sequenzdiagramm für Teil 1. Bezieht <strong>Entwicklung</strong>,
+    <strong>Qualitätssicherung (QS)</strong> und die verwendeten
+    <strong>Protokolle</strong> (an den Pfeilen in <code>[eckigen Klammern]</code>)
+    ein. Diese Datei einfach im Browser öffnen – das Diagramm wird automatisch
+    gerendert.
+  </p>
+
+  <div class="diagram">
+    <pre class="mermaid">
+sequenceDiagram
+    actor Dev as Entwickler
+    participant Local as Lokale Umgebung (Git, Maven)
+    participant GitHub as GitHub (Remote-Repo)
+    participant CI as GitHub Actions (CI/CD)
+    participant Prod as GHCR (Produktiv-Registry)
+
+    Note over Dev,Local: Entwicklung (lokal)
+    Dev->>Local: Code ändern
+    Dev->>Local: ./mvnw verify (lokal testen)
+    Local-->>Dev: Testergebnis (grün/rot)
+    Dev->>Local: git commit
+
+    Note over Dev,CI: Continuous Integration (Must)
+    Dev->>GitHub: git push [HTTPS/SSH]
+    GitHub->>CI: Workflow auslösen – Webhook [HTTPS]
+    CI->>GitHub: Quellcode auschecken [HTTPS]
+
+    Note over CI: Qualitätssicherung:<br/>kompilieren · Unit-Tests (surefire) ·<br/>Integrationstests (failsafe) · JaCoCo-Coverage ·<br/>Artefakte ablegen
+
+    alt Pipeline erfolgreich
+        CI-->>GitHub: Status "success" [HTTPS]
+        GitHub-->>Dev: Benachrichtigung "grün" [HTTPS/SMTP]
+    else Pipeline fehlgeschlagen
+        CI-->>GitHub: Status "failure" [HTTPS]
+        GitHub-->>Dev: Benachrichtigung "rot" [HTTPS/SMTP]
+    end
+
+    Note over CI,Prod: Continuous Deployment (Could) – nur auf main
+    opt grüne Pipeline und Branch = main
+        CI->>CI: Docker-Image bauen
+        CI->>Prod: Image pushen [HTTPS]
+        Prod-->>CI: Image veröffentlicht
+    end
+
+    Note over Dev,CI: Monitoring (Could) – zeitgesteuert (cron, alle 30 Min)
+    loop alle 30 Minuten bzw. manuell
+        CI->>CI: Anwendung starten
+        CI->>CI: GET /actuator/health [HTTP]
+        alt Status = UP
+            CI-->>Dev: OK (grüner Lauf)
+        else nicht erreichbar
+            CI-->>Dev: Alarm "rot" [HTTPS/SMTP]
+        end
+    end
+    </pre>
+  </div>
+
+  <h2>Legende der Protokolle</h2>
+  <table>
+    <thead>
+      <tr><th>Protokoll</th><th>Wo verwendet</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>HTTPS / SSH</td><td>git push von lokal zu GitHub</td></tr>
+      <tr><td>HTTPS</td><td>Webhook-Trigger, Checkout, Status-Updates, Image-Push zu GHCR</td></tr>
+      <tr><td>HTTP</td><td>Healthcheck-Abfrage /actuator/health im Monitoring</td></tr>
+      <tr><td>SMTP</td><td>E-Mail-Benachrichtigung über das Lauf-Ergebnis (über GitHub)</td></tr>
+    </tbody>
+  </table>
+
+  <footer>
+    Gerendert mit Mermaid (CDN). Für den Export als Bild: Rechtsklick auf das
+    Diagramm → „Grafik speichern unter…", oder den Quelltext auf mermaid.live einfügen.
+  </footer>
+
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, sequence: { showSequenceNumbers: true } });
+  </script>
+</body>
+</html>
