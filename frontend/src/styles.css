@@ -1,0 +1,8 @@
+/* Leaflet-Basis-Styles (Kacheln, Controls, Attribution) */
+@import 'leaflet/dist/leaflet.css';
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
